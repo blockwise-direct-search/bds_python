@@ -1,7 +1,6 @@
 # bds
 
-Python implementation of the Blockwise Direct Search (BDS) method, ported from
-the MATLAB code in `/Users/lihaitian/Work/bds/src`.
+Python implementation of the Blockwise Direct Search (BDS) method.
 
 BDS solves unconstrained optimization problems without using derivatives. It
 does not support bound constraints, linear constraints, nonlinear constraints,
