@@ -1,0 +1,29 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "bds"
+version = "0.1.0"
+description = "Blockwise Direct Search optimizer with a SciPy-style Python interface"
+readme = "README.md"
+requires-python = ">=3.10"
+license = {text = "MIT"}
+authors = [
+    {name = "Haitian Li"},
+]
+dependencies = [
+    "numpy>=1.24",
+]
+
+[project.optional-dependencies]
+scipy = ["scipy>=1.10"]
+test = ["pytest>=7"]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
+pythonpath = ["src"]
