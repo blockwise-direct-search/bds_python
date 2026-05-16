@@ -18,11 +18,10 @@ optional histories.
 
 ## Installation
 
-For local development, install the package in editable mode from the repository
-root:
+Install the package from the repository root:
 
 ```bash
-python -m pip install -e .
+python -m pip install .
 ```
 
 ## Quick Start
@@ -53,18 +52,3 @@ Run the full local test suite from the repository root with:
 ```bash
 PYTHONPATH=src python3 -m unittest discover -s tests
 ```
-
-## SciPy-Style Interface
-
-`minimize_bds` returns an `OptimizeResult`-like object and accepts common
-SciPy-style controls such as `maxiter`, `maxfev`, `xatol`, `fatol`, `tol`,
-`disp`, and `return_all`. Arguments outside the BDS problem class, including
-`jac`, `hess`, `hessp`, `bounds`, and `constraints`, are rejected with
-`ValueError`.
-
-Callbacks support both SciPy callback styles:
-
-- `callback(xk)`
-- `callback(intermediate_result=OptimizeResult(...))`
-
-Raising `StopIteration` from a callback terminates the solver.

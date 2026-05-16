@@ -1,10 +1,10 @@
 name: Parallel test
 
 on:
-  push:
+  # push:
   pull_request:
   schedule:
-    - cron: "0 18 1 * *"
+    - cron: "0 20 1 * *"
   workflow_dispatch:
     inputs:
       algorithm:

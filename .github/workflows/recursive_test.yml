@@ -1,10 +1,10 @@
 name: Recursive test
 
 on:
-  push:
+  # push:
   pull_request:
   schedule:
-    - cron: "0 18 3 * *"
+    - cron: "0 19 3 * *"
   workflow_dispatch:
     inputs:
       algorithm:
