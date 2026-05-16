@@ -34,7 +34,7 @@ def _recursive_objective(x, depth):
 
 class RecursiveInvocationTests(unittest.TestCase):
     def test_solver_can_be_called_recursively_from_objective(self):
-        depth = int(os.environ.get("BDS_TEST_DEPTH", "1"))
+        depth = int(os.environ.get("BDS_TEST_DEPTH") or "1")
 
         for algorithm in _selected_algorithms():
             with self.subTest(algorithm=algorithm):

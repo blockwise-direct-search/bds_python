@@ -18,14 +18,16 @@ def _is_tough():
 
 
 def _dimension():
-    if "BDS_TEST_DIMENSION" in os.environ:
-        return int(os.environ["BDS_TEST_DIMENSION"])
+    value = os.environ.get("BDS_TEST_DIMENSION")
+    if value:
+        return int(value)
     return 12 if _is_tough() else 6
 
 
 def _maxfev(n):
-    if "BDS_TEST_MAXFEV" in os.environ:
-        return int(os.environ["BDS_TEST_MAXFEV"])
+    value = os.environ.get("BDS_TEST_MAXFEV")
+    if value:
+        return int(value)
     return 160 * n if _is_tough() else 100 * n
 
 
@@ -39,7 +41,8 @@ class StressTests(unittest.TestCase):
         algorithm = _selected_algorithm()
         algorithms = (algorithm,) if algorithm else ALGORITHMS
         n = _dimension()
-        rng = np.random.default_rng(int(os.environ.get("BDS_TEST_SEED", "2026")))
+        seed = int(os.environ.get("BDS_TEST_SEED") or "2026")
+        rng = np.random.default_rng(seed)
         x0 = rng.normal(size=n)
         f0 = _chain_rosenbrock(x0)
 
@@ -53,7 +56,7 @@ class StressTests(unittest.TestCase):
                         "MaxFunctionEvaluations": _maxfev(n),
                         "StepTolerance": 0.0,
                         "alpha_init": "auto" if algorithm != "ds" else 1.0,
-                        "seed": int(os.environ.get("BDS_TEST_SEED", "2026")),
+                        "seed": seed,
                     },
                 )
 

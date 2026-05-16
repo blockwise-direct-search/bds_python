@@ -54,14 +54,6 @@ Run the full local test suite from the repository root with:
 PYTHONPATH=src python3 -m unittest discover -s tests
 ```
 
-The tests are automated by GitHub Actions:
-
-- [Unit test of BDS](https://github.com/blockwise-direct-search/bds_python/actions/workflows/unit_test.yml)
-- [Gradient test of BDS](https://github.com/blockwise-direct-search/bds_python/actions/workflows/gradient_test.yml)
-- [Stress test of BDS](https://github.com/blockwise-direct-search/bds_python/actions/workflows/stress_test.yml)
-- [Parallel test of BDS](https://github.com/blockwise-direct-search/bds_python/actions/workflows/parallel_test.yml)
-- [Recursive test of BDS](https://github.com/blockwise-direct-search/bds_python/actions/workflows/recursive_test.yml)
-
 ## SciPy-Style Interface
 
 `minimize_bds` returns an `OptimizeResult`-like object and accepts common
