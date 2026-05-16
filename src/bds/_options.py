@@ -1,8 +1,7 @@
 """Option handling for BDS.
 
-This module is the Python counterpart of the MATLAB ``set_options`` and
-``validate_options`` logic. It keeps the same algorithmic defaults and
-validation rules where possible, while also accepting SciPy-style aliases so
+This module centralizes option validation and context-dependent defaults for
+BDS. It accepts BDS-specific option names and SciPy-style aliases so
 ``minimize_bds`` can behave like a standard ``scipy.optimize`` solver.
 """
 
@@ -160,8 +159,8 @@ _DEFAULTS = {
 def canonicalize_options(options: dict | None, extra_options: dict | None = None) -> dict:
     """Merge option dictionaries and map public aliases to internal names.
 
-    MATLAB names such as ``MaxFunctionEvaluations`` and SciPy names such as
-    ``maxfev`` are both accepted. Derivative keywords are accepted only for
+    BDS-specific names such as ``MaxFunctionEvaluations`` and SciPy names such
+    as ``maxfev`` are both accepted. Derivative keywords are accepted only for
     SciPy custom-minimizer compatibility; BDS does not use them because it is
     derivative-free. Bound and constraint keywords are accepted only when empty,
     because the BDS problem class is strictly unconstrained.
@@ -247,9 +246,9 @@ def make_options(options: dict, n: int, x0: np.ndarray) -> BDSOptions:
             options.pop("num_blocks", None)
             options.pop("batch_size", None)
 
-    # Algorithm presets deliberately override the low-level block controls,
-    # matching the MATLAB priority rule. Users who want custom block behavior
-    # should omit ``algorithm`` and set num_blocks/batch_size/pattern directly.
+    # Algorithm presets deliberately override the low-level block controls.
+    # Users who want custom block behavior should omit ``algorithm`` and set
+    # num_blocks/batch_size/pattern directly.
     if algorithm == "cbds":
         num_blocks = n
         batch_size = n
@@ -449,11 +448,10 @@ def _make_alpha_init(value, x0: np.ndarray, step_tolerance: np.ndarray) -> np.nd
             raise ValueError("alpha_init string value must be 'auto'.")
         if step_tolerance.size != x0.size:
             raise ValueError("alpha_init='auto' requires num_blocks == len(x0).")
-        # Smart alpha follows the MATLAB rule: derive coordinate scales from x0
-        # while regularizing by StepTolerance. Exact zeros start with step 1;
-        # small coordinates keep their local scale; large coordinates are either
-        # kept linear or damped logarithmically when the scales of x0 are highly
-        # heterogeneous.
+        # Smart alpha derives coordinate scales from x0 while regularizing by
+        # StepTolerance. Exact zeros start with step 1; small coordinates keep
+        # their local scale; large coordinates are either kept linear or damped
+        # logarithmically when the scales of x0 are highly heterogeneous.
         abs_x0 = np.abs(x0)
         regularized_abs_x0 = np.maximum(abs_x0, np.maximum(step_tolerance, np.finfo(float).eps))
         scale_ratio = np.max(regularized_abs_x0) / np.min(regularized_abs_x0)

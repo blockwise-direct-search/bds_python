@@ -66,9 +66,10 @@ def minimize_bds(
     The interface follows ``scipy.optimize.minimize`` conventions. The return
     value is an ``OptimizeResult`` with fields such as ``x``, ``fun``,
     ``success``, ``status``, ``message``, ``nfev``, ``nit``, and ``fhist``.
-    MATLAB/BDS option names are accepted where they carry algorithmic meaning,
-    while SciPy-style aliases such as ``maxiter``, ``maxfev``, ``xatol``,
-    ``fatol``, ``tol``, ``disp``, and ``return_all`` are also supported.
+    BDS-specific option names are accepted where they carry algorithmic
+    meaning, while SciPy-style aliases such as ``maxiter``, ``maxfev``,
+    ``xatol``, ``fatol``, ``tol``, ``disp``, and ``return_all`` are also
+    supported.
 
     Important BDS options
     ---------------------
@@ -107,8 +108,8 @@ def minimize_bds(
         Delay before a selected block can be selected again. The default is the
         largest value allowed by ``floor(num_blocks / batch_size) - 1``.
     grouped_direction_indices : sequence of sequences
-        User grouping of dimensions. Indices are 1-based for MATLAB
-        compatibility at the public option boundary; internally they are
+        User grouping of dimensions. Public dimension labels are 1-based to
+        match the mathematical notation ``d_1, ..., d_n``; internally they are
         converted to Python's 0-based direction indices.
     block_visiting_pattern : {"sorted", "random", "parallel"}
         Controls the order in which sampled blocks are processed. In
@@ -169,7 +170,7 @@ def bds(fun, x0, args: tuple = (), options: dict[str, Any] | None = None, callba
 def _minimize_bds(fun, x0: np.ndarray, original_shape, opts: BDSOptions, callback) -> OptimizeResult:
     """Run the outer blockwise direct-search iteration.
 
-    The notation mirrors the MATLAB implementation:
+    The notation follows the algorithm description:
 
     * ``xopt``/``fopt`` store the best point and value seen globally.
     * ``xbase``/``fbase`` are the base point and value used to measure
@@ -570,8 +571,8 @@ def _inner_direct_search(
             print("The corresponding X is:")
             print_vector(xnew)
 
-        # Defensive NaN handling mirrors the MATLAB code: eval_fun normally
-        # turns NaN into inf for comparisons, but if this policy changes later,
+        # Defensive NaN handling: eval_fun normally turns NaN into inf for
+        # comparisons, but if this policy changes later,
         # any non-NaN value should still improve over a NaN incumbent.
         if evaluation.value < fopt or (math.isnan(fopt) and not math.isnan(evaluation.value)):
             xopt = xnew.copy()

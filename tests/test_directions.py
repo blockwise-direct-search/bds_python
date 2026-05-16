@@ -6,7 +6,7 @@ from bds._options import make_options
 
 
 class DirectionTests(unittest.TestCase):
-    def test_cycling_matches_matlab_examples(self):
+    def test_cycling_strategies_match_reference_examples(self):
         array = np.array([1, 2, 3, 4, 5])
 
         np.testing.assert_array_equal(cycling(array, 2, 0), [1, 2, 3, 4, 5])

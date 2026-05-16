@@ -19,7 +19,7 @@ The function returns an `OptimizeResult` compatible object. Important fields:
 - `allvecs`: list of evaluated points when `return_all=True` or
   `output_xhist=True`.
 
-Accepted option names include MATLAB-style names such as
+Accepted option names include BDS-specific names such as
 `MaxFunctionEvaluations`, `StepTolerance`, and `Algorithm`, plus SciPy-style
 aliases such as `maxiter`, `maxfev`, `xatol`, `fatol`, `ftol`, `tol`, `disp`,
 `return_all`, and `direc`.

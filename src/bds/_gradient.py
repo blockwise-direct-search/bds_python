@@ -58,9 +58,8 @@ def estimate_gradient(info: GradientInfo) -> np.ndarray:
             sampled_direction_indices,
         )
 
-    # The MATLAB code uses backslash here. With NumPy, lstsq gives the same
-    # "solve if possible, least-squares otherwise" behavior and avoids forcing
-    # a minimum-norm underdetermined solve, which would bias the randomized
+    # Use a basic least-squares solve for the estimator equation. This avoids a
+    # minimum-norm underdetermined solve, which would bias the randomized
     # gradient estimate toward smaller components.
     complete_basis = info.complete_direction_set[:, 0::2]
     sampled_basis = info.complete_direction_set[:, 2 * sampled_dimensions]
@@ -86,8 +85,8 @@ def gradient_error_bound(
 
     The bound uses all block step sizes, not only the latest sampled batch,
     because unvisited blocks still affect the uncertainty in the full gradient.
-    ``lipschitz_constant`` is the user-provided Hessian/Lipschitz scale used in
-    the MATLAB implementation.
+    ``lipschitz_constant`` is the user-provided Hessian/Lipschitz scale used to
+    make the stopping test robust to finite-difference error.
     """
 
     alpha_full = np.zeros(n, dtype=float)
@@ -131,7 +130,7 @@ def _estimate_directional_derivative(
         negative_positions = np.flatnonzero(direction_indices == negative_idx)
         if positive_positions.size and negative_positions.size:
             # Central difference. Forward/backward-only cases are deliberately
-            # not used, matching the MATLAB implementation's active path.
+            # not used because the estimator relies on paired direction values.
             f_pos = function_values_per_batch[batch_idx][positive_positions[0]]
             f_neg = function_values_per_batch[batch_idx][negative_positions[0]]
             return (f_pos - f_neg) / (2.0 * step_size_per_batch[batch_idx])

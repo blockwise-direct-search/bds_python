@@ -132,17 +132,15 @@ def direction_probability_matrix(
 def _repair_direction_basis(direction_set: np.ndarray) -> np.ndarray:
     """Make a possibly poor user direction set into a full basis.
 
-    The MATLAB implementation uses QR factorization with column pivoting. Here
-    we keep the same intent with NumPy primitives: preserve an independent
-    subset of user directions in their original order, then supplement it with
-    coordinate directions until a basis is obtained.
+    Preserve an independent subset of user directions in their original order,
+    then supplement it with coordinate directions until a basis is obtained.
     """
 
     n = direction_set.shape[0]
     shortest_norm = 10.0 * np.sqrt(n) * np.finfo(float).eps
     norms = np.linalg.norm(direction_set, axis=0)
-    # The sqrt(n) factor mirrors the MATLAB threshold and keeps the notion of
-    # "too short to be useful" scaled to the problem dimension.
+    # The sqrt(n) factor keeps the notion of "too short to be useful" scaled to
+    # the problem dimension.
     keep = norms >= shortest_norm
     if not np.all(keep):
         warnings.warn(
