@@ -2,9 +2,7 @@
 
 ## `minimize_bds(fun, x0, args=(), options=None, callback=None, **options)`
 
-Minimize an unconstrained scalar objective using Blockwise Direct Search. BDS
-does not solve bound-constrained, linearly constrained, nonlinearly constrained,
-or generally constrained problems.
+Minimize an unconstrained scalar objective using Blockwise Direct Search.
 
 The function returns an `OptimizeResult` compatible object. Important fields:
 
@@ -24,7 +22,5 @@ Accepted option names include BDS-specific names such as
 aliases such as `maxiter`, `maxfev`, `xatol`, `fatol`, `ftol`, `tol`, `disp`,
 `return_all`, and `direc`.
 
-The callable accepts derivative pass-through keywords such as `jac`, `hess`,
-and `hessp` for SciPy custom-minimizer compatibility. They are ignored because
-BDS is derivative-free. Nonempty `bounds` and `constraints` inputs raise
-`ValueError`.
+Arguments outside the BDS problem class, including `jac`, `hess`, `hessp`,
+`bounds`, and `constraints`, raise `ValueError`.

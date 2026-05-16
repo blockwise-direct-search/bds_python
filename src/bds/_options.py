@@ -8,13 +8,11 @@ BDS. It accepts BDS-specific option names and SciPy-style aliases so
 from __future__ import annotations
 
 import math
-import warnings
 from collections.abc import Callable
 from dataclasses import dataclass
 
 import numpy as np
 
-from ._result import OptimizeWarning
 from ._utils import as_positive_vector, is_integer_scalar
 
 _EPS = np.finfo(float).eps
@@ -108,10 +106,12 @@ _OPTION_ALIASES = {
     "gradient_estimation_complete": "gradient_estimation_complete",
 }
 
-_IGNORED_DERIVATIVE_KWARGS = {
+_UNSUPPORTED_KWARGS = {
     "jac",
     "hess",
     "hessp",
+    "bounds",
+    "constraints",
 }
 
 _DEFAULTS = {
@@ -160,40 +160,22 @@ def canonicalize_options(options: dict | None, extra_options: dict | None = None
     """Merge option dictionaries and map public aliases to internal names.
 
     BDS-specific names such as ``MaxFunctionEvaluations`` and SciPy names such
-    as ``maxfev`` are both accepted. Derivative keywords are accepted only for
-    SciPy custom-minimizer compatibility; BDS does not use them because it is
-    derivative-free. Bound and constraint keywords are accepted only when empty,
-    because the BDS problem class is strictly unconstrained.
+    as ``maxfev`` are both accepted. Arguments outside the BDS problem class,
+    including derivative and constrained-optimization arguments, are rejected
+    instead of being silently ignored.
     """
 
     merged = {}
     if options:
         merged.update(options)
     if extra_options:
-        merged.update({k: v for k, v in extra_options.items() if v is not None})
+        merged.update(extra_options)
 
     canonical = {}
     unknown = []
     for key, value in merged.items():
-        if key in _IGNORED_DERIVATIVE_KWARGS:
-            if value is not None:
-                warnings.warn(
-                    f"BDS is derivative-free; option {key!r} is accepted "
-                    "for scipy.optimize.minimize compatibility but is not used.",
-                    OptimizeWarning,
-                    stacklevel=2,
-                )
-            continue
-        if key == "bounds":
-            if _has_nonempty_bounds(value):
-                raise ValueError("BDS solves unconstrained problems and does not support bounds.")
-            continue
-        if key == "constraints":
-            if _has_nonempty_constraints(value):
-                raise ValueError(
-                    "BDS solves unconstrained problems and does not support constraints."
-                )
-            continue
+        if key in _UNSUPPORTED_KWARGS:
+            raise ValueError(_unsupported_message(key))
         if key not in _OPTION_ALIASES:
             unknown.append(key)
             continue
@@ -204,7 +186,7 @@ def canonicalize_options(options: dict | None, extra_options: dict | None = None
             canonical[canonical_key] = value
     if unknown:
         names = ", ".join(sorted(map(str, unknown)))
-        warnings.warn(f"Unknown BDS option(s) ignored: {names}.", OptimizeWarning, stacklevel=2)
+        raise ValueError(f"Unknown BDS option(s): {names}.")
     return canonical
 
 
@@ -417,29 +399,14 @@ def make_options(options: dict, n: int, x0: np.ndarray) -> BDSOptions:
 
     if options:
         names = ", ".join(sorted(options))
-        warnings.warn(f"Unhandled BDS option(s) ignored: {names}.", OptimizeWarning, stacklevel=2)
+        raise ValueError(f"Unhandled BDS option(s): {names}.")
     return result
 
 
-def _has_nonempty_bounds(value) -> bool:
-    if value is None:
-        return False
-    try:
-        bounds = list(value)
-    except TypeError:
-        return True
-    return any(bound is not None for bound in bounds)
-
-
-def _has_nonempty_constraints(value) -> bool:
-    if value is None:
-        return False
-    if isinstance(value, dict):
-        return bool(value)
-    try:
-        return len(value) > 0
-    except TypeError:
-        return bool(value)
+def _unsupported_message(name: str) -> str:
+    if name in {"jac", "hess", "hessp"}:
+        return f"BDS is derivative-free and does not accept {name}."
+    return f"BDS is an unconstrained solver and does not accept {name}."
 
 
 def _make_alpha_init(value, x0: np.ndarray, step_tolerance: np.ndarray) -> np.ndarray:

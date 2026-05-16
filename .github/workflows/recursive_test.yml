@@ -1,0 +1,47 @@
+name: Recursive test
+
+on:
+  push:
+  pull_request:
+  schedule:
+    - cron: "0 18 3 * *"
+  workflow_dispatch:
+    inputs:
+      algorithm:
+        description: Algorithm preset (Optional)
+        required: false
+      depth:
+        description: Depth of recursion (Optional)
+        required: false
+
+run-name: ${{ github.event_name == 'workflow_dispatch' && format('Manual run algorithm {0}, recursion depth {1}', inputs.algorithm, inputs.depth) || '' }}
+
+jobs:
+  test:
+    name: Recursive test of BDS
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+        python-version: ["3.10", "3.11", "3.12", "3.13"]
+        algorithm: [cbds, pbds, rbds, pads, ds]
+
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: pip
+
+      - name: Install package
+        run: python -m pip install -e .
+
+      - name: Run recursive tests
+        env:
+          BDS_TEST_ALGORITHM: ${{ inputs.algorithm || matrix.algorithm }}
+          BDS_TEST_DEPTH: ${{ inputs.depth || '1' }}
+        run: python -m unittest tests.test_recursive

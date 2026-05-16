@@ -1,0 +1,58 @@
+name: Stress test
+
+on:
+  schedule:
+    - cron: "0 18 2 * *"
+  workflow_dispatch:
+    inputs:
+      algorithm:
+        description: Algorithm preset (Optional)
+        required: false
+      tough:
+        description: Tough test flag, true or false (Optional)
+        required: false
+      dimension:
+        description: Problem dimension (Optional)
+        required: false
+      maxfev:
+        description: Maximum function evaluations (Optional)
+        required: false
+      random-seed:
+        description: Random seed (Optional)
+        required: false
+
+run-name: ${{ github.event_name == 'workflow_dispatch' && format('Manual run algorithm {0}, tough {1}, dimension {2}, maxfev {3}, seed {4}', inputs.algorithm, inputs.tough, inputs.dimension, inputs.maxfev, inputs['random-seed']) || '' }}
+
+jobs:
+  test:
+    name: Stress test
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+        python-version: ["3.12"]
+        algorithm: [cbds, pbds, rbds, pads, ds]
+        tough: ["false", "true"]
+
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: pip
+
+      - name: Install package
+        run: python -m pip install -e .
+
+      - name: Run stress tests
+        env:
+          BDS_TEST_ALGORITHM: ${{ inputs.algorithm || matrix.algorithm }}
+          BDS_TEST_TOUGH: ${{ inputs.tough || matrix.tough }}
+          BDS_TEST_DIMENSION: ${{ inputs.dimension }}
+          BDS_TEST_MAXFEV: ${{ inputs.maxfev }}
+          BDS_TEST_SEED: ${{ inputs['random-seed'] }}
+        run: python -m unittest tests.test_stress

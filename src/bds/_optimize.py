@@ -139,10 +139,10 @@ def minimize_bds(
 
     Notes
     -----
-    ``jac``, ``hess``, and ``hessp`` are accepted for SciPy custom-minimizer
-    compatibility but ignored with an ``OptimizeWarning`` when supplied. Bounds
-    and constraints are not part of the BDS problem class; nonempty
-    ``bounds``/``constraints`` inputs raise ``ValueError``.
+    BDS is derivative-free and unconstrained. Derivative-related arguments
+    such as ``jac``, ``hess``, and ``hessp`` and constrained-optimization
+    arguments such as ``bounds`` and ``constraints`` are rejected with
+    ``ValueError``.
     """
 
     x0_arr = as_float_array(x0, name="x0")

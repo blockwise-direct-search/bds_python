@@ -2,7 +2,6 @@
 
 try:  # pragma: no cover - exercised only when SciPy is installed.
     from scipy.optimize import OptimizeResult as OptimizeResult
-    from scipy.optimize import OptimizeWarning as OptimizeWarning
 except Exception:  # pragma: no cover - fallback is covered in this environment.
 
     class OptimizeResult(dict):
@@ -27,7 +26,3 @@ except Exception:  # pragma: no cover - fallback is covered in this environment.
                 del self[name]
             except KeyError as exc:
                 raise AttributeError(name) from exc
-
-
-    class OptimizeWarning(UserWarning):
-        """Fallback warning class matching ``scipy.optimize.OptimizeWarning``."""

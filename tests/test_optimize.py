@@ -102,14 +102,10 @@ class OptimizeTests(unittest.TestCase):
         self.assertLess(res.fun, 1e-5)
         np.testing.assert_allclose(res.x, [1.0, 1.0], atol=5e-3)
 
-    def test_scipy_custom_method_kwargs_are_accepted(self):
+    def test_scipy_style_supported_options_work(self):
         res = minimize_bds(
             lambda x: np.sum((x - 1.0) ** 2),
             [3.0, 3.0],
-            jac=lambda x: 2 * (x - 1.0),
-            hess=lambda x: np.eye(2),
-            bounds=None,
-            constraints=(),
             tol=1e-6,
             maxiter=20,
             maxfev=200,
@@ -122,19 +118,30 @@ class OptimizeTests(unittest.TestCase):
         self.assertTrue(hasattr(res, "allvecs"))
         self.assertGreaterEqual(len(res.allvecs), 1)
 
-    def test_bounds_and_constraints_are_rejected(self):
-        with self.assertRaisesRegex(ValueError, "does not support bounds"):
-            minimize_bds(
-                lambda x: np.sum(x**2),
-                [1.0, 1.0],
-                bounds=[(0.0, None), (None, None)],
-            )
+    def test_unsupported_derivative_and_constraint_arguments_are_rejected(self):
+        unsupported_cases = [
+            ("jac", lambda x: x),
+            ("hess", lambda x: np.eye(2)),
+            ("hessp", lambda x, p: p),
+            ("bounds", None),
+            ("constraints", ()),
+        ]
 
-        with self.assertRaisesRegex(ValueError, "does not support constraints"):
+        for name, value in unsupported_cases:
+            with self.subTest(name=name):
+                with self.assertRaisesRegex(ValueError, f"does not accept {name}"):
+                    minimize_bds(
+                        lambda x: np.sum(x**2),
+                        [1.0, 1.0],
+                        **{name: value},
+                    )
+
+    def test_unknown_options_are_rejected(self):
+        with self.assertRaisesRegex(ValueError, "Unknown BDS option"):
             minimize_bds(
                 lambda x: np.sum(x**2),
                 [1.0, 1.0],
-                constraints=({"type": "ineq", "fun": lambda x: x[0]},),
+                not_an_option=True,
             )
 
     def test_callback_accepts_xk_and_stop_iteration(self):
