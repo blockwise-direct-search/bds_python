@@ -44,11 +44,3 @@ The shorter alias `bds(...)` is also available.
 SciPy is optional. When SciPy is installed, BDS returns SciPy's
 `scipy.optimize.OptimizeResult`; otherwise it returns a compatible fallback
 object.
-
-## Testing
-
-Run the full local test suite from the repository root with:
-
-```bash
-PYTHONPATH=src python3 -m unittest discover -s tests
-```

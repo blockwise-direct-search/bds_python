@@ -8,3 +8,6 @@ venv/
 build/
 dist/
 *.egg-info/
+.DS_Store
+pycutest_cache_holder/
+tests/testdata/
