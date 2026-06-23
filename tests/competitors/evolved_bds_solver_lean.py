@@ -4,7 +4,6 @@ This variant keeps the strategies that looked useful in the local
 investigation:
 - explicit productive displacement memory beyond cycling
 - sweep-level pattern / momentum extrapolation
-- low-dimensional diagonal probing on stagnation
 
 It deliberately drops the mixed heuristics from the full evolved solver:
 - success-rate coordinate ordering
@@ -83,31 +82,6 @@ def _try_extrapolation(fun, xbase, fbase, direction, step, nf, maxfun):
     return xbest, fbest, nf
 
 
-def _diagonal_directions(n):
-    """Return a small hand-crafted diagonal direction set for low dimensions."""
-
-    if not 2 <= n <= 10:
-        return None
-
-    d_all = np.ones(n, dtype=float) / np.sqrt(n)
-    pairs = [d_all, -d_all]
-
-    if n >= 3:
-        d_alt = np.ones(n, dtype=float)
-        d_alt[1::2] = -1.0
-        d_alt /= np.linalg.norm(d_alt)
-        if np.abs(np.dot(d_all, d_alt)) < 0.95:
-            pairs.extend([d_alt, -d_alt])
-
-    if n >= 4:
-        d_dec = np.arange(n, 0, -1, dtype=float)
-        d_dec /= np.linalg.norm(d_dec)
-        if not any(np.abs(np.dot(d_dec, p)) > 0.95 for p in pairs):
-            pairs.extend([d_dec, -d_dec])
-
-    return np.column_stack(pairs)
-
-
 def _remember_direction(prod_memory, direction, step, mem_size):
     """Store a productive direction unless a nearly parallel one exists."""
 
@@ -149,7 +123,6 @@ def solver(fun, x0):
     D[:, 1::2] = -np.eye(n)
     grouped_direction_indices = [[2 * k, 2 * k + 1] for k in range(n)]
 
-    diag_dirs = _diagonal_directions(n)
     mem_size = max(1, min(n, 5))
     prod_memory: list[tuple[np.ndarray, float]] = []
     momentum = np.zeros(n, dtype=float)
@@ -164,7 +137,6 @@ def solver(fun, x0):
     fbase = f0
     xopt = x0.copy()
     fopt = f0
-    stagnation_count = 0
     terminate = False
 
     for _iter in range(maxit):
@@ -236,9 +208,6 @@ def solver(fun, x0):
         disp_norm = np.linalg.norm(displacement)
         if fbase < fbase_sweep_start:
             sweep_improved = True
-            stagnation_count = 0
-        else:
-            stagnation_count += 1
 
         # Sweep-level pattern / momentum extrapolation.
         if not terminate and sweep_improved and disp_norm > alpha_tol and nf < maxfun:
@@ -288,32 +257,6 @@ def solver(fun, x0):
                 fbase = f_pat
                 if best_dir is not None:
                     _remember_direction(prod_memory, best_dir, alpha_pat, mem_size)
-
-        # Diagonal probing on stagnation, low dimensions only.
-        if (
-            not terminate
-            and not sweep_improved
-            and diag_dirs is not None
-            and stagnation_count >= 1
-            and nf < maxfun - diag_dirs.shape[1] + 1
-        ):
-            n_diag = diag_dirs.shape[1]
-            diag_step = float(np.median(alpha_all))
-            offset = (stagnation_count - 1) % max(1, n_diag // 2)
-            for j in range(n_diag):
-                if nf >= maxfun:
-                    break
-                idx = (j + offset) % n_diag
-                x_cand = xbase + diag_step * diag_dirs[:, idx]
-                f_cand = float(fun(x_cand))
-                nf += 1
-                if f_cand < fbase:
-                    xbase = x_cand.copy()
-                    fbase = f_cand
-                    sweep_improved = True
-                    stagnation_count = 0
-                    _remember_direction(prod_memory, diag_dirs[:, idx], diag_step, mem_size)
-                    break
 
         fopt, xopt = _best_recorded_point(fopt_all, xopt_all, fopt, xopt)
         if fbase < fopt:

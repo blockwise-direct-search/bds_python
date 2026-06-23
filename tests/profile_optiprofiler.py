@@ -5,8 +5,9 @@ This module is a profiling/benchmark driver, not a unit test.  It mirrors the
 role of the MATLAB ``profile_optiprofiler.m`` script: it translates a small
 set of solver names and feature names into an OptiProfiler benchmark call.
 
-Only unconstrained problems are selected.  The initial Python version supports
-the ``plain``, ``noisy``, and ``linearly_transformed`` features.
+Only unconstrained problems are selected.  The Python driver supports the
+``plain``, ``noisy``, ``linearly_transformed``, and
+``linearly_transformed_noisy`` feature aliases.
 """
 
 from __future__ import annotations
@@ -154,9 +155,9 @@ def profile_optiprofiler(options: Mapping[str, Any] | SimpleNamespace):
     options : mapping or object with attributes
         Benchmark options.  The required keys are ``feature_name`` and
         ``solver_names``.  The solver names must contain at least two entries
-        chosen from ``bds``, ``evolved-bds``, ``evolved-bds-lean``, ``nomad``, ``cbds``,
-        ``pbds``, ``rbds``, ``pads``, ``ds``, ``nelder-mead``, ``powell``,
-        ``cobyla``, and ``cobyqa``.
+        chosen from ``bds``, ``evolved-bds``, ``evolved-bds-lean``,
+        ``nomad``, ``cbds``, ``pbds``, ``rbds``, ``pads``, ``ds``,
+        ``nelder-mead``, ``powell``, ``cobyla``, and ``cobyqa``.
 
     Returns
     -------
@@ -170,12 +171,13 @@ def profile_optiprofiler(options: Mapping[str, Any] | SimpleNamespace):
     from optiprofiler import benchmark
 
     opts = _as_options_dict(options)
-    feature_name = _require_string(opts, "feature_name")
+    feature_name_raw = _require_string(opts, "feature_name")
     solver_names = _normalize_solver_names(opts.pop("solver_names", None))
-    feature_name, feature_options = _parse_feature_name(feature_name)
+    feature_is_noisy = _is_noisy_feature_name(feature_name_raw)
+    feature_name, feature_options = _parse_feature_name(feature_name_raw)
     _expand_dim_shortcut(opts)
 
-    solvers = [_solver_from_name(name, is_noisy=feature_name == "noisy") for name in solver_names]
+    solvers = [_solver_from_name(name, is_noisy=feature_is_noisy) for name in solver_names]
     benchmark_options = _build_benchmark_options(opts, feature_name, feature_options, solver_names)
 
     return benchmark(solvers, **benchmark_options)
@@ -280,7 +282,7 @@ def _run_scipy_minimize(fun, x0, method: str):
 
 
 def _max_function_evaluations(x0) -> int:
-    return 500 * np.asarray(x0, dtype=float).size
+    return 200 * np.asarray(x0, dtype=float).size
 
 
 def _as_options_dict(options: Mapping[str, Any] | SimpleNamespace) -> dict[str, Any]:
@@ -340,11 +342,60 @@ def _parse_feature_name(feature_name: str) -> tuple[str, dict[str, Any]]:
         return "plain", {}
     if feature_name == "linearly_transformed":
         return "linearly_transformed", {}
+    if feature_name == "linearly_transformed_noisy":
+        return _linearly_transformed_noisy_feature_options(1e-3)
+    if feature_name.startswith("linearly_transformed_noisy_"):
+        return _linearly_transformed_noisy_feature_options(
+            _parse_noise_level(feature_name.removeprefix("linearly_transformed_noisy_"))
+        )
     if feature_name == "noisy":
         return "noisy", {"noise_level": 1e-3}
     if feature_name.startswith("noisy_"):
         return "noisy", {"noise_level": _parse_noise_level(feature_name.rsplit("_", 1)[1])}
-    raise ValueError("feature_name must be 'plain', 'linearly_transformed', 'noisy', or 'noisy_<level>'.")
+    raise ValueError(
+        "feature_name must be 'plain', 'linearly_transformed', 'noisy', 'noisy_<level>', "
+        "'linearly_transformed_noisy', or 'linearly_transformed_noisy_<level>'."
+    )
+
+
+def _linearly_transformed_noisy_feature_options(noise_level: float) -> tuple[str, dict[str, Any]]:
+    return (
+        "custom",
+        {
+            "mod_affine": partial(_linearly_transformed_affine_modifier, rotated=True, condition_factor=0.0),
+            "mod_fun": partial(_mixed_gaussian_noise_fun_modifier, noise_level=noise_level),
+            "_feature_stamp": f"linearly_transformed_noisy_{_format_noise_level_for_stamp(noise_level)}",
+        },
+    )
+
+
+def _linearly_transformed_affine_modifier(rng, problem, *, rotated: bool, condition_factor: float):
+    from scipy.linalg import qr
+
+    if rotated:
+        rand_matrix = rng.standard_normal((problem.n, problem.n))
+        q, r = qr(rand_matrix)
+        q[:, np.diag(r) < 0] *= -1
+    else:
+        q = np.eye(problem.n)
+
+    log_condition_number = np.sqrt(condition_factor * problem.n / 2)
+    power = np.linspace(-log_condition_number / 2, log_condition_number / 2, problem.n)
+    affine = np.diag(2**power) @ q.T
+    affine_inverse = q @ np.diag(2 ** (-power))
+    return affine, np.zeros(problem.n), affine_inverse
+
+
+def _mixed_gaussian_noise_fun_modifier(x, rng, problem, *, noise_level: float) -> float:
+    f = float(problem.fun(x))
+    return float(f + max(1.0, abs(f)) * noise_level * rng.standard_normal())
+
+
+def _is_noisy_feature_name(feature_name: str) -> bool:
+    feature_name = feature_name.strip().lower()
+    return feature_name == "noisy" or feature_name.startswith("noisy_") or feature_name.startswith(
+        "linearly_transformed_noisy"
+    )
 
 
 def _parse_noise_level(value: str) -> float:
@@ -358,6 +409,13 @@ def _parse_noise_level(value: str) -> float:
     return noise_level
 
 
+def _format_noise_level_for_stamp(noise_level: float) -> str:
+    exponent = -np.log10(noise_level)
+    if np.isclose(exponent, round(exponent)):
+        return f"1e-{int(round(exponent))}"
+    return str(noise_level).replace(".", "_")
+
+
 def _build_benchmark_options(
     options: dict[str, Any],
     feature_name: str,
@@ -365,11 +423,13 @@ def _build_benchmark_options(
     solver_names: list[str],
 ) -> dict[str, Any]:
     options = dict(options)
+    feature_options = dict(feature_options)
     savepath = Path(options.pop("savepath", Path(__file__).resolve().parent / "testdata"))
     savepath.mkdir(parents=True, exist_ok=True)
     solver_verbose = options.pop("solver_verbose", 2)
     problem_libraries = _normalize_problem_libraries(options.pop("plibs", None))
     feature_stamp = options.pop("feature_stamp", None)
+    parsed_feature_stamp = feature_options.pop("_feature_stamp", None)
     options = _apply_problem_exclusions(options, problem_libraries)
 
     if "ptype" in options and options["ptype"] != "u":
@@ -379,7 +439,7 @@ def _build_benchmark_options(
     if n_runs is None:
         n_runs = 1 if feature_name == "plain" else 2
     if feature_stamp is None:
-        feature_stamp = _default_feature_stamp(feature_name, {**options, **feature_options})
+        feature_stamp = parsed_feature_stamp or _default_feature_stamp(feature_name, {**options, **feature_options})
     feature_stamp = _append_problem_library_stamp(str(feature_stamp), problem_libraries)
 
     benchmark_options = {
@@ -543,7 +603,11 @@ def _append_problem_library_stamp(feature_stamp: str, problem_libraries: list[st
 def _parse_cli_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("solver_names", nargs="+", help="Two or more solvers to compare.")
-    parser.add_argument("--feature-name", default="plain", help="plain, linearly_transformed, noisy, or noisy_<level>.")
+    parser.add_argument(
+        "--feature-name",
+        default="plain",
+        help="plain, linearly_transformed, noisy, noisy_<level>, or linearly_transformed_noisy_<level>.",
+    )
     parser.add_argument("--dim", choices=["small", "big", "large"], help="Dimension range shortcut.")
     parser.add_argument("--mindim", type=int, help="Minimum problem dimension.")
     parser.add_argument("--maxdim", type=int, help="Maximum problem dimension.")
