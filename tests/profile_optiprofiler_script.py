@@ -8,7 +8,7 @@ from profile_optiprofiler import profile_optiprofiler
 
 def main() -> None:
     options = {
-        "mindim": 2,
+        "mindim": 6,
         "maxdim": 50,
         "plibs": "s2mpj",
         "feature_name": "plain",
