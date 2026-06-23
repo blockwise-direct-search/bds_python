@@ -147,13 +147,13 @@ _PYCUTEST_LARGE_DEFAULT_INSTANCES = {"INTEQNELS", "OSCIPATH"}
 
 
 def profile_optiprofiler(options: Mapping[str, Any] | SimpleNamespace):
-    """Run an OptiProfiler benchmark for two selected solvers.
+    """Run an OptiProfiler benchmark for selected solvers.
 
     Parameters
     ----------
     options : mapping or object with attributes
         Benchmark options.  The required keys are ``feature_name`` and
-        ``solver_names``.  The solver names must contain exactly two entries
+        ``solver_names``.  The solver names must contain at least two entries
         chosen from ``bds``, ``evolved-bds``, ``evolved-bds-lean``, ``nomad``, ``cbds``,
         ``pbds``, ``rbds``, ``pads``, ``ds``, ``nelder-mead``, ``powell``,
         ``cobyla``, and ``cobyqa``.
@@ -322,8 +322,11 @@ def _normalize_solver_names(value) -> list[str]:
         except TypeError as exc:
             raise TypeError("solver_names must be a sequence of strings.") from exc
 
-    if len(names) != 2:
-        raise ValueError("Exactly two solver names must be provided for comparison.")
+    if len(names) < 2:
+        raise ValueError("At least two solver names must be provided for comparison.")
+    duplicates = sorted({name for name in names if names.count(name) > 1})
+    if duplicates:
+        raise ValueError(f"Duplicate solver name(s): {', '.join(duplicates)}.")
     unknown = sorted(set(names) - _ALLOWED_SOLVER_NAMES)
     if unknown:
         allowed = ", ".join(sorted(_ALLOWED_SOLVER_NAMES))
@@ -539,7 +542,7 @@ def _append_problem_library_stamp(feature_stamp: str, problem_libraries: list[st
 
 def _parse_cli_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("solver_names", nargs=2, help="Two solvers to compare.")
+    parser.add_argument("solver_names", nargs="+", help="Two or more solvers to compare.")
     parser.add_argument("--feature-name", default="plain", help="plain, linearly_transformed, noisy, or noisy_<level>.")
     parser.add_argument("--dim", choices=["small", "big", "large"], help="Dimension range shortcut.")
     parser.add_argument("--mindim", type=int, help="Minimum problem dimension.")
