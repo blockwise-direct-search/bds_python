@@ -12,18 +12,22 @@ the ``plain``, ``noisy``, and ``linearly_transformed`` features.
 from __future__ import annotations
 
 import argparse
+import importlib
+import os
+import sys
 from collections.abc import Mapping
-from functools import partial
+from functools import lru_cache, partial
 from pathlib import Path
 from types import SimpleNamespace
 from typing import Any
 
 import numpy as np
 
-from bds import minimize_bds
-
 
 _ALLOWED_SOLVER_NAMES = {
+    "bds",
+    "competitor-bds",
+    "evolved-bds",
     "cbds",
     "pbds",
     "rbds",
@@ -36,6 +40,12 @@ _ALLOWED_SOLVER_NAMES = {
 }
 
 _BDS_SOLVER_NAMES = {"cbds", "pbds", "rbds", "pads", "ds"}
+
+_COMPETITOR_SOLVER_MODULES = {
+    "bds": "competitors.bds",
+    "competitor-bds": "competitors.bds",
+    "evolved-bds": "competitors.evolved_bds_solver",
+}
 
 _ALLOWED_PROBLEM_LIBRARIES = {"s2mpj", "pycutest"}
 
@@ -55,8 +65,9 @@ def profile_optiprofiler(options: Mapping[str, Any] | SimpleNamespace):
     options : mapping or object with attributes
         Benchmark options.  The required keys are ``feature_name`` and
         ``solver_names``.  The solver names must contain exactly two entries
-        chosen from ``cbds``, ``pbds``, ``rbds``, ``pads``, ``ds``,
-        ``nelder-mead``, ``powell``, ``cobyla``, and ``cobyqa``.
+        chosen from ``bds``, ``evolved-bds``, ``cbds``, ``pbds``, ``rbds``,
+        ``pads``, ``ds``, ``nelder-mead``, ``powell``, ``cobyla``, and
+        ``cobyqa``.
 
     Returns
     -------
@@ -64,6 +75,8 @@ def profile_optiprofiler(options: Mapping[str, Any] | SimpleNamespace):
         The ``(solver_scores, profile_scores, curves)`` tuple returned by
         :func:`optiprofiler.benchmark`.
     """
+
+    _configure_matplotlib_environment()
 
     from optiprofiler import benchmark
 
@@ -134,6 +147,8 @@ def scipy_cobyqa(fun, x0):
 
 
 def _run_bds(fun, x0, algorithm: str, *, is_noisy: bool):
+    from bds import minimize_bds
+
     x0 = np.asarray(x0, dtype=float)
     result = minimize_bds(
         fun,
@@ -185,6 +200,17 @@ def _as_options_dict(options: Mapping[str, Any] | SimpleNamespace) -> dict[str, 
     if hasattr(options, "__dict__"):
         return dict(vars(options))
     raise TypeError("options must be a mapping or an object with attributes.")
+
+
+def _configure_matplotlib_environment() -> None:
+    """Use a headless, writable Matplotlib setup before OptiProfiler imports it."""
+
+    cache_root = Path(__file__).resolve().parent / "testdata" / ".cache"
+    cache_root.mkdir(parents=True, exist_ok=True)
+
+    os.environ.setdefault("MPLBACKEND", "Agg")
+    os.environ.setdefault("MPLCONFIGDIR", str(cache_root / "matplotlib"))
+    os.environ.setdefault("XDG_CACHE_HOME", str(cache_root / "xdg"))
 
 
 def _require_string(options: dict[str, Any], name: str) -> str:
@@ -319,6 +345,8 @@ def _normalize_problem_names(value, name: str) -> list[str]:
 
 
 def _solver_from_name(name: str, *, is_noisy: bool):
+    if name in _COMPETITOR_SOLVER_MODULES:
+        return _load_competitor_solver(name)
     if name in _BDS_SOLVER_NAMES:
         return partial(_run_bds_by_algorithm, name, is_noisy)
     return {
@@ -329,7 +357,31 @@ def _solver_from_name(name: str, *, is_noisy: bool):
     }[name]
 
 
+@lru_cache(maxsize=None)
+def _load_competitor_solver(name: str):
+    tests_dir = Path(__file__).resolve().parent
+    tests_dir_str = str(tests_dir)
+    if tests_dir_str not in sys.path:
+        sys.path.insert(0, tests_dir_str)
+
+    module_name = _COMPETITOR_SOLVER_MODULES[name]
+    try:
+        module = importlib.import_module(module_name)
+    except ImportError as exc:
+        path = tests_dir / Path(*module_name.split(".")).with_suffix(".py")
+        raise ImportError(f"Cannot import competitor solver from {path}.") from exc
+
+    solver = getattr(module, "solver", None)
+    if not callable(solver):
+        raise AttributeError(f"Competitor module {module_name} must define callable solver(fun, x0).")
+    return solver
+
+
 def _display_name(name: str) -> str:
+    if name in {"bds", "competitor-bds"}:
+        return "BDS"
+    if name == "evolved-bds":
+        return "Evolved BDS"
     if name == "nelder-mead":
         return "Nelder-Mead"
     if name in {"cobyla", "cobyqa"}:
