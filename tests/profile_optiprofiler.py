@@ -29,6 +29,7 @@ _ALLOWED_SOLVER_NAMES = {
     "competitor-bds",
     "evolved-bds",
     "evolved-bds-lean",
+    "nomad",
     "cbds",
     "pbds",
     "rbds",
@@ -47,6 +48,7 @@ _COMPETITOR_SOLVER_MODULES = {
     "competitor-bds": "competitors.bds",
     "evolved-bds": "competitors.evolved_bds_solver",
     "evolved-bds-lean": "competitors.evolved_bds_solver_lean",
+    "nomad": "competitors.nomad_solver",
 }
 
 _ALLOWED_PROBLEM_LIBRARIES = {"s2mpj", "pycutest"}
@@ -152,7 +154,7 @@ def profile_optiprofiler(options: Mapping[str, Any] | SimpleNamespace):
     options : mapping or object with attributes
         Benchmark options.  The required keys are ``feature_name`` and
         ``solver_names``.  The solver names must contain exactly two entries
-        chosen from ``bds``, ``evolved-bds``, ``evolved-bds-lean``, ``cbds``,
+        chosen from ``bds``, ``evolved-bds``, ``evolved-bds-lean``, ``nomad``, ``cbds``,
         ``pbds``, ``rbds``, ``pads``, ``ds``, ``nelder-mead``, ``powell``,
         ``cobyla``, and ``cobyqa``.
 
@@ -475,6 +477,8 @@ def _display_name(name: str) -> str:
         return "Evolved BDS"
     if name == "evolved-bds-lean":
         return "Lean Evolved BDS"
+    if name == "nomad":
+        return "NOMAD"
     if name == "nelder-mead":
         return "Nelder-Mead"
     if name in {"cobyla", "cobyqa"}:
