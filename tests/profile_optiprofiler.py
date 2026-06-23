@@ -28,6 +28,7 @@ _ALLOWED_SOLVER_NAMES = {
     "bds",
     "competitor-bds",
     "evolved-bds",
+    "evolved-bds-lean",
     "cbds",
     "pbds",
     "rbds",
@@ -45,9 +46,95 @@ _COMPETITOR_SOLVER_MODULES = {
     "bds": "competitors.bds",
     "competitor-bds": "competitors.bds",
     "evolved-bds": "competitors.evolved_bds_solver",
+    "evolved-bds-lean": "competitors.evolved_bds_solver_lean",
 }
 
 _ALLOWED_PROBLEM_LIBRARIES = {"s2mpj", "pycutest"}
+
+_DEFAULT_EXCLUDELISTS = {
+    "s2mpj": {
+        "DIAMON2DLS",
+        "DIAMON2D",
+        "DIAMON3DLS",
+        "DIAMON3D",
+        "DMN15102LS",
+        "DMN15102",
+        "DMN15103LS",
+        "DMN15103",
+        "DMN15332LS",
+        "DMN15332",
+        "DMN15333LS",
+        "DMN15333",
+        "DMN37142LS",
+        "DMN37142",
+        "DMN37143LS",
+        "DMN37143",
+        "ROSSIMP3_mp",
+        "BAmL1SPLS",
+        "FBRAIN3LS",
+        "GAUSS1LS",
+        "GAUSS2LS",
+        "GAUSS3LS",
+        "HYDC20LS",
+        "HYDCAR6LS",
+        "LUKSAN11LS",
+        "LUKSAN12LS",
+        "LUKSAN13LS",
+        "LUKSAN14LS",
+        "LUKSAN17LS",
+        "LUKSAN21LS",
+        "LUKSAN22LS",
+        "METHANB8LS",
+        "METHANL8LS",
+        "SPINLS",
+        "VESUVIALS",
+        "VESUVIOLS",
+        "VESUVIOULS",
+        "YATP1CLS",
+        "MISRA1ALS",
+        "OSBORNEA",
+        "ECKERLE4LS",
+        "NELSONLS",
+    },
+    "pycutest": {
+        "ARGTRIGLS",
+        "BROWNAL",
+        "COATING",
+        "DIAMON2DLS",
+        "DIAMON3DLS",
+        "DMN15102LS",
+        "DMN15103LS",
+        "DMN15332LS",
+        "DMN15333LS",
+        "DMN37142LS",
+        "DMN37143LS",
+        "ERRINRSM",
+        "HYDC20LS",
+        "LRA9A",
+        "LRCOVTYPE",
+        "LUKSAN12LS",
+        "LUKSAN14LS",
+        "LUKSAN17LS",
+        "LUKSAN21LS",
+        "LUKSAN22LS",
+        "MANCINO",
+        "PENALTY2",
+        "PENALTY3",
+        "VARDIM",
+        "GAUSS1LS",
+        "GAUSS2LS",
+        "GAUSS3LS",
+        "CERI651ALS",
+        "CERI651BLS",
+        "CERI651CLS",
+        "CERI651DLS",
+        "CERI651ELS",
+        "MISRA1ALS",
+        "OSBORNEA",
+        "ECKERLE4LS",
+        "NELSONLS",
+    },
+}
 
 # PyCUTEst's default metadata puts these problems in the 6--20 dimensional
 # range, but the loaded CUTEst instances used by OptiProfiler are actually
@@ -65,9 +152,9 @@ def profile_optiprofiler(options: Mapping[str, Any] | SimpleNamespace):
     options : mapping or object with attributes
         Benchmark options.  The required keys are ``feature_name`` and
         ``solver_names``.  The solver names must contain exactly two entries
-        chosen from ``bds``, ``evolved-bds``, ``cbds``, ``pbds``, ``rbds``,
-        ``pads``, ``ds``, ``nelder-mead``, ``powell``, ``cobyla``, and
-        ``cobyqa``.
+        chosen from ``bds``, ``evolved-bds``, ``evolved-bds-lean``, ``cbds``,
+        ``pbds``, ``rbds``, ``pads``, ``ds``, ``nelder-mead``, ``powell``,
+        ``cobyla``, and ``cobyqa``.
 
     Returns
     -------
@@ -310,6 +397,10 @@ def _apply_problem_exclusions(options: dict[str, Any], problem_libraries: list[s
     options = dict(options)
     exclusions = _normalize_problem_names(options.pop("excludelist", []), "excludelist")
 
+    if not options.get("problem_names"):
+        for library in problem_libraries:
+            exclusions.extend(sorted(_DEFAULT_EXCLUDELISTS.get(library, ())))
+
     if _should_exclude_pycutest_large_default_instances(options, problem_libraries):
         exclusions = list(dict.fromkeys([*exclusions, *_PYCUTEST_LARGE_DEFAULT_INSTANCES]))
 
@@ -382,6 +473,8 @@ def _display_name(name: str) -> str:
         return "BDS"
     if name == "evolved-bds":
         return "Evolved BDS"
+    if name == "evolved-bds-lean":
+        return "Lean Evolved BDS"
     if name == "nelder-mead":
         return "Nelder-Mead"
     if name in {"cobyla", "cobyqa"}:
