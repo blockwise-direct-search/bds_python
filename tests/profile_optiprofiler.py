@@ -16,6 +16,7 @@ import argparse
 import importlib
 import os
 import sys
+from contextlib import contextmanager
 from collections.abc import Mapping
 from functools import lru_cache, partial
 from pathlib import Path
@@ -168,19 +169,20 @@ def profile_optiprofiler(options: Mapping[str, Any] | SimpleNamespace):
 
     _configure_matplotlib_environment()
 
-    from optiprofiler import benchmark
-
     opts = _as_options_dict(options)
     feature_name_raw = _require_string(opts, "feature_name")
     solver_names = _normalize_solver_names(opts.pop("solver_names", None))
     feature_is_noisy = _is_noisy_feature_name(feature_name_raw)
-    feature_name, feature_options = _parse_feature_name(feature_name_raw)
+    feature_name, feature_options, feature_display_name = _parse_feature_name(feature_name_raw)
     _expand_dim_shortcut(opts)
 
     solvers = [_solver_from_name(name, is_noisy=feature_is_noisy) for name in solver_names]
     benchmark_options = _build_benchmark_options(opts, feature_name, feature_options, solver_names)
 
-    return benchmark(solvers, **benchmark_options)
+    from optiprofiler import benchmark
+
+    with _optiprofiler_feature_display_name(feature_name, feature_display_name):
+        return benchmark(solvers, **benchmark_options)
 
 
 def cbds(fun, x0):
@@ -336,12 +338,12 @@ def _normalize_solver_names(value) -> list[str]:
     return names
 
 
-def _parse_feature_name(feature_name: str) -> tuple[str, dict[str, Any]]:
+def _parse_feature_name(feature_name: str) -> tuple[str, dict[str, Any], str]:
     feature_name = feature_name.strip().lower()
     if feature_name == "plain":
-        return "plain", {}
+        return "plain", {}, "plain"
     if feature_name == "linearly_transformed":
-        return "linearly_transformed", {}
+        return "linearly_transformed", {}, "linearly_transformed"
     if feature_name == "linearly_transformed_noisy":
         return _linearly_transformed_noisy_feature_options(1e-3)
     if feature_name.startswith("linearly_transformed_noisy_"):
@@ -349,24 +351,51 @@ def _parse_feature_name(feature_name: str) -> tuple[str, dict[str, Any]]:
             _parse_noise_level(feature_name.removeprefix("linearly_transformed_noisy_"))
         )
     if feature_name == "noisy":
-        return "noisy", {"noise_level": 1e-3}
+        return "noisy", {"noise_level": 1e-3}, "noisy_1e-3"
     if feature_name.startswith("noisy_"):
-        return "noisy", {"noise_level": _parse_noise_level(feature_name.rsplit("_", 1)[1])}
+        noise_level = _parse_noise_level(feature_name.rsplit("_", 1)[1])
+        return "noisy", {"noise_level": noise_level}, f"noisy_{_format_noise_level_for_stamp(noise_level)}"
     raise ValueError(
         "feature_name must be 'plain', 'linearly_transformed', 'noisy', 'noisy_<level>', "
         "'linearly_transformed_noisy', or 'linearly_transformed_noisy_<level>'."
     )
 
 
-def _linearly_transformed_noisy_feature_options(noise_level: float) -> tuple[str, dict[str, Any]]:
+def _linearly_transformed_noisy_feature_options(noise_level: float) -> tuple[str, dict[str, Any], str]:
+    noise_stamp = _format_noise_level_for_stamp(noise_level)
     return (
         "custom",
         {
             "mod_affine": partial(_linearly_transformed_affine_modifier, rotated=True, condition_factor=0.0),
             "mod_fun": partial(_mixed_gaussian_noise_fun_modifier, noise_level=noise_level),
-            "_feature_stamp": f"linearly_transformed_noisy_{_format_noise_level_for_stamp(noise_level)}",
+            "_feature_stamp": f"linearly_transformed_noisy_{noise_stamp}",
         },
+        f"linearly_transformed_noisy_{noise_stamp}",
     )
+
+
+@contextmanager
+def _optiprofiler_feature_display_name(feature_name: str, display_name: str):
+    """Temporarily use a profile-level display name in OptiProfiler titles."""
+
+    from optiprofiler.opclasses import Feature
+
+    original_name = Feature.name
+    display_name = _escape_matplotlib_text(display_name)
+
+    def displayed_name(self):
+        name = original_name.fget(self)
+        return display_name if name == feature_name else name
+
+    Feature.name = property(displayed_name)
+    try:
+        yield
+    finally:
+        Feature.name = original_name
+
+
+def _escape_matplotlib_text(value: str) -> str:
+    return value.replace("\\", "\\\\").replace("_", "\\_")
 
 
 def _linearly_transformed_affine_modifier(rng, problem, *, rotated: bool, condition_factor: float):
